@@ -1,10 +1,12 @@
 "use server";
 
-import { createAdminClient } from "@/lib/appwrite";
+import { createAdminClient, createSessionClient } from "@/lib/appwrite";
 import { appwriteConfig } from "@/lib/appwrite/config";
 import { Query, ID } from "node-appwrite";
 import { parseStringify } from "@/lib/utils";
 import { cookies } from "next/headers";
+import { avatarPlaceholderUrl } from "@/constants";
+import { parse } from "path";
 
 // Create account flow
 // 1. User enters full name and email
@@ -79,7 +81,7 @@ export const createAccount = async ({
 			{
 				fullName,
 				email,
-				avatar: "https://th.bing.com/th/id/OIP.hGSCbXlcOjL_9mmzerqAbQHaHa?w=181&h=181&c=7&r=0&o=5&pid=1.7",
+				avatar: avatarPlaceholderUrl,
 				accountId,
 			}
 		);
@@ -111,3 +113,17 @@ export const verifySecret = async ({
 		handleError(error, "Failed to verify OTP");
 	}
 };
+
+export const getCurrentUser = async () => {
+	const { account, databases } = await createSessionClient();
+	const result = await account.get();
+	const user = await databases.listDocuments(
+		appwriteConfig.databaseId,
+		appwriteConfig.usersCollectionId,
+		[Query.equal("accountId", result.$id)]
+	)
+
+	if (user.total <= 0) return null;
+
+	return parseStringify(user.documents[0]);
+}
