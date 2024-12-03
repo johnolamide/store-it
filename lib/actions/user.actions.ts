@@ -7,6 +7,7 @@ import { parseStringify } from "@/lib/utils";
 import { cookies } from "next/headers";
 import { avatarPlaceholderUrl } from "@/constants";
 import { parse } from "path";
+import { redirect } from "next/navigation";
 
 // Create account flow
 // 1. User enters full name and email
@@ -50,18 +51,7 @@ type createAccountSchema = {
 	email: string;
 };
 
-/**
- * Creates a new user account.
- *
- * This function checks if a user with the given email already exists. If the user does not exist,
- * it sends an OTP to the provided email and creates a new user document in the database.
- *
- * @param {Object} params - The parameters for creating an account.
- * @param {string} params.fullName - The full name of the user.
- * @param {string} params.email - The email address of the user.
- * @returns {Promise<string>} The account ID as a string.
- * @throws {Error} If sending the OTP fails.
- */
+
 export const createAccount = async ({
 	fullName,
 	email,
@@ -126,4 +116,32 @@ export const getCurrentUser = async () => {
 	if (user.total <= 0) return null;
 
 	return parseStringify(user.documents[0]);
+}
+
+export const signOutUser = async () => {
+	const { account } = await createSessionClient();
+
+	try {
+		await account.deleteSession("current");
+		(await cookies()).delete("appwrite-session");
+		console.log("User logged out successfully");
+	} catch (error) {
+		handleError(error, "Failed to sign out user");
+	} finally {
+		redirect("/sign-in");
+	}
+}
+
+export const signInUser = async ({ email }: { email: string }) => {
+	try {
+		const existingUser = await getUserByEmail(email);
+		if (existingUser) {
+			await sendEmailOTP({ email });
+			return parseStringify({ accountId: existingUser.accountId });
+		}
+
+		return parseStringify({ accountId: null, error: "User not found" });
+	} catch (error) {
+		handleError(error, "Failed to sign in user");
+	}
 }
